@@ -1,0 +1,20 @@
+# The available ground truth state measurements can be accessed by calling sensor_data[item]. All values of "item" are provided as defined in main.py within the function read_sensors. 
+# The "item" values that you may later retrieve for the hardware project are:
+# "x_global": Global X position
+# "y_global": Global Y position
+# "z_global": Global Z position
+# 'v_x": Global X velocity
+# "v_y": Global Y velocity
+# "v_z": Global Z velocity
+# "ax_global": Global X acceleration
+# "ay_global": Global Y acceleration
+# "az_global": Global Z acceleration (With gravtiational acceleration subtracted)
+# "roll": Roll angle (rad)
+# "pitch": Pitch angle (rad)
+# "yaw": Yaw angle (rad)
+# "q_x": X Quaternion value
+# "q_y": Y Quaternion value
+# "q_z": Z Quaternion value
+# "q_w": W Quaternion value
+
+# A link to further information on how to access the sensor data on the Crazyflie hardware for the hardware practical can be found here: https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/api/logs/#stateestimate

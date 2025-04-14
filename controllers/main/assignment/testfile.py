@@ -1,28 +1,31 @@
 import cv2
 import numpy as np
-#import function detect_gates from detect_gates.py
-from detect_gates import detect_gates
+import time
+from typing import List, Tuple, Dict, Optional
+from class_fences_detection import ShapeCorners
+from class_fences_detection import ShapeDetector
 
 
-def test_detect_gates(image_path):
-    image = cv2.imread(image_path)
-    if image is None:
-        print("Error: Could not load image!")
-        return
 
-    gates = detect_gates(image)
-    print("Detected gates (x, y, w, h):", gates)
-    
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+image = cv2.imread('controllers/main/assignment/example_picture_2.png')
 
-# Test with a sample image
-gates = test_detect_gates("controllers/main/assignment/example_picture.png")
+# Define color range for purple
+lower_purple = np.array([130, 50, 50])
+upper_purple = np.array([170, 255, 255])
 
-# Check if any gates were found
-if gates:
-    print(f"Detected {len(gates)} gate(s):")
-    for i, (x, y, w, h) in enumerate(gates, 1):
-        print(f"Gate {i}: x={x}, y={y}, width={w}, height={h}")
-# else:
-#     print("No gates detected")
+# Create shape detector and detect shapes
+detector = ShapeDetector()
+shapes = detector.detect_shapes(image, lower_purple, upper_purple)
+
+# Print information about each shape
+for i, shape in enumerate(shapes):
+    print(f"Shape {i+1}:")
+    print(shape)
+    print()
+
+# Draw shapes on image
+detector.draw_shapes(image)
+# Display result
+cv2.imshow('Detected Shapes', image)
+cv2.waitKey(0)
+cv2.destroyAllWindows()

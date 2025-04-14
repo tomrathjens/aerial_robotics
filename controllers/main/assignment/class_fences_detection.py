@@ -1,44 +1,9 @@
 import numpy as np
-import time
 import cv2
 from typing import List, Tuple, Dict, Optional
 
-## Finate state machine initialisation
-round_counter = 0
-state = "start"
 
-def get_command(sensor_data, camera_data, dt):
-    global round_counter, state
-    
-    # Take off example
-    if sensor_data['z_global'] < 0.49:
-        control_command = [sensor_data['x_global'], sensor_data['y_global'], 1.0, sensor_data['yaw']]
-        return control_command, camera_data #TKKK remove camera_data when submiting
-
-        ########################PART 1 : opencv : fences detection##################################################
-    image = camera_data.copy() 
-    
-    # Range for our purple color in hsv
-    lower_purple = np.array([130, 50, 50])
-    upper_purple = np.array([170, 255, 255])
-
-    # Create fence detector and search for fences
-    detector = ShapeDetector()
-    shapes = detector.detect_shapes(image, lower_purple, upper_purple)
-    
-    # Draw shapes on image
-    detector.draw_shapes(image)
-    
-    
-    # Your control logic here
-    control_command = [sensor_data['x_global'], sensor_data['y_global'], 1.0, sensor_data['yaw']]
-    
-    camera_data_processed = image.copy()
-    return control_command, camera_data_processed #TKK at the end remove camera_dara_processed attention !!#camera_data # Ordered as array with: [pos_x_cmd, pos_y_cmd, pos_z_cmd, yaw_cmd] in meters and radians
-
-
-#########################################_ADDITIONAL FUNCTIONS : ################################
-
+############################ Class 1 : ShapeCorners to compute all important infos ############################
 class ShapeCorners:
     def __init__(self, corners: List[Tuple[int, int]]):
         self.corners = corners # List of corner points (x, y)

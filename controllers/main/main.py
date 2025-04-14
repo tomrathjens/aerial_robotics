@@ -659,7 +659,7 @@ def path_planner_thread(drone):
             dt_planner = current_time - last_planner_time
             last_planner_time = current_time
 
-            new_setpoint = assignment.get_command(sensor_data_copy, camera_data_copy, dt_planner)
+            new_setpoint, _= assignment.get_command(sensor_data_copy, camera_data_copy, dt_planner)#TKKK to delete when submitting
             
             with setpoint_lock:
                 current_setpoint = new_setpoint
@@ -728,8 +728,15 @@ if __name__ == '__main__':
                         camera_data = drone.read_camera()
                         
 
-                        cv2.imshow("Crazyflie FPV Camera", camera_data)
-                        cv2.waitKey(1)  # This is necessary to refresh the window
+
+                        ##BEGIN CODE TOM #to delete when submitting
+                        control_command, camera_data_processed = assignment.get_command(sensor_data, camera_data, drone.dt_ctrl)
+                        #from controllers.main.assignment.my_assignment import camera_data_processed
+                        cv2.imshow("Crazyflie FPV Camera", camera_data_processed)
+                        cv2.waitKey(1)  
+                        ##END CODE TOM
+
+
                         # Update the sensor data in the thread
                         with sensor_lock:
                             latest_sensor_data = sensor_data
