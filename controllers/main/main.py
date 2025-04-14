@@ -3,6 +3,7 @@ import sys
 print("You are using python at this location:", sys.executable)
 
 import numpy as np
+import cv2
 from controller import Supervisor, Keyboard
 from exercises.ex1_pid_control import quadrotor_controller
 from exercises.ex2_kalman_filter import kalman_filter as KF
@@ -27,6 +28,8 @@ current_setpoint = np.zeros(4)
 setpoint_lock = threading.Lock()
 
 running = True
+
+
 
 # Crazyflie drone class in webots
 class CrazyflieInDroneDome(Supervisor):
@@ -305,6 +308,7 @@ class CrazyflieInDroneDome(Supervisor):
         # print('curr_segment:', curr_segment, 'drone.segment:', drone.segment)
         if curr_segment == 0 and drone.segment == 5:
             elapsed_time = drone.getTime() - drone.start_time
+            drone.start_time = 0
             drone.lap_times[drone.lap] = elapsed_time
             drone.lap += 1
             print(f"Lap completed. Total time elapsed: {elapsed_time:.2f} seconds") 
@@ -541,7 +545,8 @@ class CrazyflieInDroneDome(Supervisor):
         image = np.frombuffer(camera_image, np.uint8).reshape((self.camera.getHeight(), self.camera.getWidth(), 4))
 
         return image
-    
+
+
     # Detect which segment the drone is in
     def check_segment(self, sensor_data):
         drone_pos = np.array([sensor_data['x_global'], sensor_data['y_global'], sensor_data['z_global']])
@@ -722,6 +727,9 @@ if __name__ == '__main__':
                         # Read the camera feed
                         camera_data = drone.read_camera()
                         
+
+                        cv2.imshow("Crazyflie FPV Camera", camera_data)
+                        cv2.waitKey(1)  # This is necessary to refresh the window
                         # Update the sensor data in the thread
                         with sensor_lock:
                             latest_sensor_data = sensor_data
@@ -752,3 +760,22 @@ if __name__ == '__main__':
 
 
 
+# ## My CODE :
+# def display_camera_image(self):
+#     image = self.read_camera()
+#     cv2.imshow("FPV camera", image)
+    
+#     # press q to quit
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         return False
+#     return True
+
+# while self.robot.step(self.timestep) != -1:
+#     if not self.display_camera_image():
+#         break  # Exit if 'q' is pressed
+
+# cv2.destroyAllWindows()  # Cleanup
+
+# while(True):
+#     image = self.read_camera()
+#     cv2.imshow("FPV camera", image)

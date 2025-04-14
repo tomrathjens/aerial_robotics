@@ -1,6 +1,9 @@
 import numpy as np
 import time
 import cv2
+# from detect_gates import detect_gates
+#import detect_gates
+
 
 # The available ground truth state measurements can be accessed by calling sensor_data[item]. All values of "item" are provided as defined in main.py within the function read_sensors. 
 # The "item" values that you may later retrieve for the hardware project are:
@@ -35,5 +38,29 @@ def get_command(sensor_data, camera_data, dt):
 
     # ---- YOUR CODE HERE ----
     control_command = [sensor_data['x_global'], sensor_data['y_global'], 1.0, sensor_data['yaw']]
+
+
+    detect_gates(camera_data)
     
     return control_command # Ordered as array with: [pos_x_cmd, pos_y_cmd, pos_z_cmd, yaw_cmd] in meters and radians
+
+import cv2
+import numpy as np
+
+def test_detect_gates(image_path):
+    # 1. Load the test image
+    image = cv2.imread(image_path)
+    if image is None:
+        print("Error: Could not load image!")
+        return
+    
+    # 2. Call detect_gates()
+    gates = detect_gates(image)
+    print("Detected gates (x, y, w, h):", gates)
+    
+    # 3. Wait for key press to close windows
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+# Test with a sample image
+test_detect_gates("test_gate.jpg")  # Replace with your image path
