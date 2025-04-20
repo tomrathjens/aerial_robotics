@@ -13,9 +13,14 @@ state = "ground"
 frame_time = 0
 gate_coordinates = []
 wait_start_time = None
+gate_count = 0
+#Personnal thoughts : would like to add : 
+# side functions to strenghen the code : 
+# - a function so that if fence is too fare <=> fence area too small : first move forwards. 
+
 
 def get_command(sensor_data, camera_data, dt):
-    global round_counter, state, fence_count, origin_position, current_setpoint, frame_time, gate_coordinates, last_position, last_center,X, wait_start_time
+    global round_counter, state, fence_count, origin_position, current_setpoint, frame_time, gate_coordinates, last_position, last_center,X, wait_start_time, gate_count
     
     ############################## PART 1 : opencv : continuous fences detection ##################################################
     # Create fence detector and search for fences
@@ -31,7 +36,7 @@ def get_command(sensor_data, camera_data, dt):
 
     # STEP 1 : Take off
     if  state == "ground":
-        control_command, status = move_to_position(current_position,[current_position[0],current_position[1],1,current_position[3]] )
+        control_command, status = move_to_abs_position(current_position,[current_position[0],current_position[1],1,current_position[3]] )
         if status == "reached_target":
             #save the origin position
             gate_coordinates.append([sensor_data['x_global'], sensor_data['y_global'], sensor_data['z_global'], sensor_data['yaw']])
@@ -39,13 +44,31 @@ def get_command(sensor_data, camera_data, dt):
             last_position = current_position
             last_center = shapes[0].center #saves the last picture's data for the triangulation
             print("Take off complete")
+            
     
+    # Loop for each of the 5 fences : 
+
     # STEP 2 : Move to the first fence
     if state == "step2_triangulation1":
-        offset = [-0.4, 0, 0, np.pi/4] #move to the right position of the fence
-        control_command, status = move_to_position(current_position,np.add(last_position, offset))        
+
+        distance = 1
+        dir = "right"
+        additional_rotation_angle = np.pi/4
+        #save png file of the image
+        name1 = f"image_gate{gate_count}_1.png"
+        cv2.imwrite(name1, image)
+
+        control_command, status = move_to_abs_position(current_position, abs_target_position_calculator(dir, distance, last_position,additional_rotation_angle))
+        # offset = [-0.4, 0, 0, np.pi/4] #move to the right position of the fence
+        # control_command, status = move_to_abs_position(current_position,np.add(last_position, offset))        
         if status == "reached_target":
+            #state = "step2_triangulation2"
             state = "step2_triangulation2"
+            #save png file of the image with number of gate : 
+            
+            name2 = f"image_gate{gate_count}_2.png"
+            
+            cv2.imwrite(name2, image)
 
     if state == "step2_triangulation2":
         if wait_start_time is None:        #wait few seconds to let the drone stabilize
@@ -59,29 +82,37 @@ def get_command(sensor_data, camera_data, dt):
             if current_center is not None:
                 print("Current center:", current_center)
                 
-                # --- Proceed with triangulation --- last_center and current_center are the two pixel observations
+                # Triangulation
                 triangulated_point = triangulate_from_pixels(last_center, current_center, image, last_position, current_position)
                 gate_coordinates.append([triangulated_point[0], triangulated_point[1], triangulated_point[2], sensor_data['yaw']])
                 print("Triangulated 3D point:", triangulated_point)
                 state = "round1"
-                # u1p, v1p, reproj_err = reprojection_error(X, R1, t1, K, last_center)
-                # print(f"Reprojected: ({u1p:.1f}, {v1p:.1f}),   error = {reproj_err:.2f} px")
-
     
     if state == "round1":
         
-        control_command, status = move_to_position(current_position,[gate_coordinates[1][0],gate_coordinates[1][1],gate_coordinates[1][2], gate_coordinates[1][3]] )
+        control_command, status = move_to_abs_position(current_position,[gate_coordinates[gate_count+1][0],gate_coordinates[gate_count+1][1],gate_coordinates[gate_count+1][2], gate_coordinates[gate_count+1][3]] )
         if status == "reached_target":
-            print("reached gate 1")
+            print("reached gate number", gate_count+1)
             state = "triangulation 2"
             last_position = current_position
-            
+            gate_count += 1
+        
     if state == "triangulation 2":
-        offset = [0, 0, 0, np.pi/2] #move to the right position of the fence
-        control_command, status = move_to_position(current_position,np.add(last_position, offset))
+        distance = 0.5
+        dir = "forwards"
+        additional_rotation_angle = np.pi/4
+        control_command, status = move_to_abs_position(current_position, abs_target_position_calculator(dir, distance, last_position,additional_rotation_angle))
         if status == "reached_target":
-            state = "round2"
-            print("Reached second fence. Waiting to stabilize...")
+            state = "step2_triangulation1"
+            last_position = current_position
+            last_center = shapes[0].center #saves the last picture's data for the triangulation
+            
+    # if state == "triangulation 2":
+    #     offset = [0, 0, 0, np.pi/2] #move to the right position of the fence
+    #     control_command, status = move_to_position(current_position,np.add(last_position, offset))
+    #     if status == "reached_target":
+    #         state = "round2"
+    #         print("Reached second fence. Waiting to stabilize...")
     
 
 
@@ -268,26 +299,44 @@ def triangulate_from_pixels(pix1, pix2, image, last_position,current_position):
     return X
 
 ############################## Move to position function : #######################################
-def move_to_position(current_position, target_position):
+def move_to_abs_position(current_position, target_position):
     status = "moving"
     # Calculate Euclidean distance using only x, y, z coordinates (ignoring yaw)
     distancex_y = math.sqrt((target_position[0] - current_position[0])**2 + 
                         (target_position[1] - current_position[1])**2) 
     distancez = abs(target_position[2] - current_position[2])
     angle_error = abs(target_position[3]-current_position[3])
+    
     if(distancex_y > 0.2) or (distancez > 0.01) or (angle_error > np.pi/8): #if we are not close to the target position, we can move to it
         # Move towards the target position
         control_command = [target_position[0], target_position[1], target_position[2], target_position[3]] #move to the center of the fence
-
         return control_command, status 
 
     else:
         status = "reached_target"
         control_command = [current_position[0], current_position[1], current_position[2], current_position[3]] #stay in the same position
-        print("Reached target position")
+        #print("Reached target position")
     
     
     return control_command, status 
+
+################################### Move to direction #######################################################
+def abs_target_position_calculator(dir, distance, last_position, additional_rotation_angle):
+    # Calculate the target position based on the current position and wanted direction
+    if dir == "forwards":
+        dir = 0
+    elif dir == "backwards":
+        dir = -np.pi
+    elif dir == "left":
+        dir = np.pi/2
+    elif dir == "right":
+        dir = +np.pi/2
+    target_position = np.array([last_position[0] + distance * math.cos(last_position[3]-dir),
+                                last_position[1] + distance * math.sin(last_position[3]-dir),
+                                last_position[2],
+                                last_position[3]+additional_rotation_angle]) #add the additional rotation angle to the yaw
+    
+    return target_position
 
 
 ################################## yaw rotation function : #######################################
@@ -297,4 +346,5 @@ def yaw_rotation(yaw):
                      [            0,              0, 1]])
 
 
-################################### test #######################################################
+
+
