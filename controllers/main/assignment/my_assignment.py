@@ -17,6 +17,8 @@ gate_count = 0
 #Personnal thoughts : would like to add : 
 # side functions to strenghen the code : 
 # - a function so that if fence is too fare <=> fence area too small : first move forwards. 
+#like a correction fction : for example if to far or to much rotated (height not small but area small): then move forwards and redo the triangulation
+# - the move to the right function to be proportionate to the distance of the fence's center to the center of the taken pictur
 
 
 def get_command(sensor_data, camera_data, dt):
@@ -40,81 +42,62 @@ def get_command(sensor_data, camera_data, dt):
         if status == "reached_target":
             #save the origin position
             gate_coordinates.append([sensor_data['x_global'], sensor_data['y_global'], sensor_data['z_global'], sensor_data['yaw']])
-            state = "step2_triangulation1"
+            state = "step2.1"
             last_position = current_position
             last_center = shapes[0].center #saves the last picture's data for the triangulation
             print("Take off complete")
             
     
-    # Loop for each of the 5 fences : 
-
-    # STEP 2 : Move to the first fence
-    if state == "step2_triangulation1":
-
-        distance = 1
+    # STEP 2 : Detect and move to each fence
+    if state == "step2.1": #move to the right and rotate to capture 2nd picture for triangulation
+        distance = 0.4
         dir = "right"
         additional_rotation_angle = np.pi/4
-        #save png file of the image
-        name1 = f"image_gate{gate_count}_1.png"
+
+        name1 = f"image_gate{gate_count}_pic1.png" #save png file of the image for debugging purposes :
         cv2.imwrite(name1, image)
 
-        control_command, status = move_to_abs_position(current_position, abs_target_position_calculator(dir, distance, last_position,additional_rotation_angle))
-        # offset = [-0.4, 0, 0, np.pi/4] #move to the right position of the fence
-        # control_command, status = move_to_abs_position(current_position,np.add(last_position, offset))        
+        control_command, status = move_to_abs_position(current_position, 
+                                                       abs_target_position_calculator(dir, distance, last_position,additional_rotation_angle))  
         if status == "reached_target":
-            #state = "step2_triangulation2"
-            state = "step2_triangulation2"
-            #save png file of the image with number of gate : 
-            
-            name2 = f"image_gate{gate_count}_2.png"
-            
+            state = "step2.2"
+
+            name2 = f"image_gate{gate_count}_pic2.png" #save png file of the image with number of gate :
             cv2.imwrite(name2, image)
 
-    if state == "step2_triangulation2":
-        if wait_start_time is None:        #wait few seconds to let the drone stabilize
+    if state == "step2.2": #wait for stabilization, capture second picture and triangulate
+        if wait_start_time is None: #wait few seconds to let the drone stabilize
                 wait_start_time = time.time()  # Start waiting
-                print("Reached first fence. Waiting to stabilize...")
 
         elif time.time() - wait_start_time >= 1.0:  # wait 2 seconds
-            state = "round1"
+            state = "step2.3"
             wait_start_time = None 
             current_center = shapes[0].center if shapes else None
-            if current_center is not None:
-                print("Current center:", current_center)
-                
+            if current_center is not None:                
                 # Triangulation
                 triangulated_point = triangulate_from_pixels(last_center, current_center, image, last_position, current_position)
                 gate_coordinates.append([triangulated_point[0], triangulated_point[1], triangulated_point[2], sensor_data['yaw']])
-                print("Triangulated 3D point:", triangulated_point)
-                state = "round1"
+                print("Triangulated 3D gate #", gate_count, ":", triangulated_point)
+                state = "step2.3"
     
-    if state == "round1":
+    if state == "step2.3":
         
         control_command, status = move_to_abs_position(current_position,[gate_coordinates[gate_count+1][0],gate_coordinates[gate_count+1][1],gate_coordinates[gate_count+1][2], gate_coordinates[gate_count+1][3]] )
         if status == "reached_target":
             print("reached gate number", gate_count+1)
-            state = "triangulation 2"
+            state = "step2.4"
             last_position = current_position
             gate_count += 1
         
-    if state == "triangulation 2":
+    if state == "step2.4":
         distance = 0.5
         dir = "forwards"
         additional_rotation_angle = np.pi/4
         control_command, status = move_to_abs_position(current_position, abs_target_position_calculator(dir, distance, last_position,additional_rotation_angle))
         if status == "reached_target":
-            state = "step2_triangulation1"
+            state = "step2.1"
             last_position = current_position
             last_center = shapes[0].center #saves the last picture's data for the triangulation
-            
-    # if state == "triangulation 2":
-    #     offset = [0, 0, 0, np.pi/2] #move to the right position of the fence
-    #     control_command, status = move_to_position(current_position,np.add(last_position, offset))
-    #     if status == "reached_target":
-    #         state = "round2"
-    #         print("Reached second fence. Waiting to stabilize...")
-    
-
 
     cv2.imshow("Crazyflie FPV Camera", image)
     cv2.waitKey(1) 
