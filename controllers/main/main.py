@@ -729,12 +729,12 @@ if __name__ == '__main__':
                         
 
 
-                        ##BEGIN CODE TOM #to delete when submitting
-                        control_command, camera_data_processed = assignment.get_command(sensor_data, camera_data, drone.dt_ctrl)
-                        #from controllers.main.assignment.my_assignment import camera_data_processed
-                        cv2.imshow("Crazyflie FPV Camera", camera_data_processed)
-                        cv2.waitKey(1)  
-                        ##END CODE TOM
+                        # ##BEGIN CODE TOM #to delete when submitting
+                        # cTOMontrol_command, camera_data_processed = assignment.get_command(sensor_data, camera_data, drone.dt_ctrl)
+                        # #from controllers.main.assignment.my_assignment import camera_data_processed
+                        # cv2.imshow("Crazyflie FPV Camera", camera_data_processed)
+                        # cv2.waitKey(1)  
+                        # ##END CODE 
 
 
                         # Update the sensor data in the thread
@@ -765,24 +765,3 @@ if __name__ == '__main__':
         running = False
         planner_thread.join()
 
-
-
-# ## My CODE :
-# def display_camera_image(self):
-#     image = self.read_camera()
-#     cv2.imshow("FPV camera", image)
-    
-#     # press q to quit
-#     if cv2.waitKey(1) & 0xFF == ord('q'):
-#         return False
-#     return True
-
-# while self.robot.step(self.timestep) != -1:
-#     if not self.display_camera_image():
-#         break  # Exit if 'q' is pressed
-
-# cv2.destroyAllWindows()  # Cleanup
-
-# while(True):
-#     image = self.read_camera()
-#     cv2.imshow("FPV camera", image)
