@@ -189,7 +189,7 @@ def get_command(sensor_data, camera_data, dt):
         #extract the coordinates of the gates from the list of coordinates
         gate_coordinates2=[gate_coordinates[0], gate_coordinates[1], gate_coordinates[2], gate_coordinates[3], gate_coordinates[4],gate_coordinates[5], gate_coordinates[0]]
         #export as text file
-        np.savetxt("gate_coordinates2.txt", gate_coordinates2, delimiter=",", fmt="%.6f")
+        #np.savetxt("gate_coordinates2.txt", gate_coordinates2, delimiter=",", fmt="%.6f")
         #generate the spline path with yaw
         checkpoints = generate_spline_path_with_yaw(gate_coordinates2, num_points=30)
 
