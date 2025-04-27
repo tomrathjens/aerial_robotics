@@ -3,7 +3,6 @@ import sys
 print("You are using python at this location:", sys.executable)
 
 import numpy as np
-import cv2
 from controller import Supervisor, Keyboard
 from exercises.ex1_pid_control import quadrotor_controller
 from exercises.ex2_kalman_filter import kalman_filter as KF
@@ -28,8 +27,6 @@ current_setpoint = np.zeros(4)
 setpoint_lock = threading.Lock()
 
 running = True
-
-
 
 # Crazyflie drone class in webots
 class CrazyflieInDroneDome(Supervisor):
@@ -545,8 +542,7 @@ class CrazyflieInDroneDome(Supervisor):
         image = np.frombuffer(camera_image, np.uint8).reshape((self.camera.getHeight(), self.camera.getWidth(), 4))
 
         return image
-
-
+    
     # Detect which segment the drone is in
     def check_segment(self, sensor_data):
         drone_pos = np.array([sensor_data['x_global'], sensor_data['y_global'], sensor_data['z_global']])
@@ -726,6 +722,7 @@ if __name__ == '__main__':
 
                         # Read the camera feed
                         camera_data = drone.read_camera()
+                        
                         # Update the sensor data in the thread
                         with sensor_lock:
                             latest_sensor_data = sensor_data
@@ -753,4 +750,3 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         running = False
         planner_thread.join()
-

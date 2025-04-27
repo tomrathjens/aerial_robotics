@@ -15,6 +15,7 @@ wait_start_time = None
 lookout_position = [[0,3,1,-np.pi/3], [3.5,1,1,np.pi*2/6], [5.5,2,1,np.pi/3], [7,5,1,np.pi*5/6],[5,7,1,np.pi+np.pi/6]] #position to look out for the fence
 k=0
 count =0
+potential_gate_coord_saved=[]
 #Personnal thoughts : would like to add : 
 # side functions to make the code more robust : 
 # - a function so that if fence is too fare <=> fence area too small : first move forwards. 
@@ -33,8 +34,10 @@ count =0
 #     COMPLETED = "completed"
 #     EMERGENCY = "emergency"
 
+#mode = "coding" # "coding" or "not coding"
+mode = "not coding" # "coding" or "not coding"
 def get_command(sensor_data, camera_data, dt):
-    global round_counter, state, fence_count, origin_position, current_setpoint, frame_time, gate_coordinates, last_position, last_center, X, wait_start_time, gate_count, k, triangulated_point, max_area, target, count, trajectory_setpoints, trajectory_index, current_gate_index, gate_index, checkpoints,potential_gate_coord
+    global round_counter, state, fence_count, origin_position, current_setpoint, frame_time, gate_coordinates, last_position, last_center, X, wait_start_time, gate_count, k, triangulated_point, max_area, target, count, trajectory_setpoints, trajectory_index, current_gate_index, gate_index, checkpoints,potential_gate_coord,emergency_detection, mode, potential_gate_coord_saved
     
     ############################## PART 1 : opencv : continuous fences detection ##################################################
     # Create fence detector and search for fences
@@ -53,33 +56,49 @@ def get_command(sensor_data, camera_data, dt):
     if  state == None: #initialisation of the state machine
         state = "takeoff"
         gate_count = 0
-        print("Initialisation of the state machine")
+        if mode == "coding":
+            print("Initialisation of the state machine")
+        emergency_detection = "actif"
 
     # STEP 2 : emergency stop if the drone is too far from the origin
-    if current_position[0]>9 or current_position[1]>9 or current_position[0]<-1 or current_position[1]<-1: #if the drone is too far from the origin, we need to go back to the origin
+    if current_position[0]>8.5 or current_position[1]>8.5 or current_position[0]<-0.5 or current_position[1]<-0.5 and emergency_detection =="actif": #if the drone is too far from the origin, we need to go back to the origin
         gate_count +=1
-        print("Emergency stop, going to next gate")
+        gate_coordinates.append([lookout_position])
+        if gate_count ==5:
+            state = "Race_mode"
+            if mode == "coding":
+                print("Emergency stop, Starting Race mode")
+            emmergency_detection= "inactif"
+        if gate_count <5:
+            state = "navigate"
+            if mode == "coding":
+                print("Emergency stop, going to next gate")
+            emmergency_detection = "inactif"
     if state == "takeoff":
         target = [current_position[0],current_position[1],1,current_position[3]]
         control_command, status = move_to_abs_position(current_position,target )
         if status == "reached_target":
             gate_coordinates.append([sensor_data['x_global'], sensor_data['y_global'], sensor_data['z_global'], sensor_data['yaw']])
             state = "navigate"
-            print("Take off complete")
+            if mode == "coding":
+                print("Take off complete")
 
     if state == "navigate":# Move to the first lookout position
         target = [lookout_position[gate_count][0],lookout_position[gate_count][1],lookout_position[gate_count][2],sensor_data['yaw']]
         control_command, status = move_to_abs_position(current_position, target)
         if status == "reached_target":
             state = "search"
+            k=0
 
 
     if state == "search": #search for the fence
-        if shapes and shapes[0].area > 500:
+        emmergency_detection = "actif"
+        if shapes and shapes[0].area > 100:
             state = "centering"
             # print("Shape detected with sufficient area:", shapes[0].area)
             last_position = current_position
             last_center = shapes[0].center  # Save the last picture's data for triangulation
+            
         elif shapes:
             # print("Shape detected but area too small:", shapes[0].area)
             # Continue rotating to get a better view
@@ -139,9 +158,10 @@ def get_command(sensor_data, camera_data, dt):
                 angular_error = abs(shape.get_orientation())
                 if angular_error > 0.05:
                     state = "centering"
-                    print("Drone not centered on the fence, going back to centering")
+                    if mode == "coding":
+                        print("Drone not centered on the fence, going back to centering")
 
-        control_command, status,max_area,count,potential_gate_coord = traverse_detection(current_position,camera_data, max_area,count)
+        control_command, status,max_area,count,potential_gate_coord,potential_gate_coord_saved = traverse_detection(current_position,camera_data, max_area,count,mode,potential_gate_coord_saved)
         if status == "reached_target":
             state = "forward"
             gate_count += 1
@@ -154,11 +174,13 @@ def get_command(sensor_data, camera_data, dt):
         control_command, status = move_to_abs_position(current_position, target )
         max_area = 0 #reset the max area for the next gate
         if status == "reached_target":
-            print("reached gate number", gate_count)
+            if mode == "coding":
+                print("reached gate number", gate_count)
             state = "navigate"
             if gate_count == 5:
                 state = "Race_mode"
-                print("All gates traversed, Racing begin")
+                if mode == "coding":
+                    print("All gates traversed, Racing begin")
             
 
 ################################ PART 3 : Race mode ###############################################################
@@ -177,10 +199,12 @@ def get_command(sensor_data, camera_data, dt):
         if status == "reached_target":
             state = "racing part2 : Lap1"
             gate_index = 0
-            print("Reached origin position")
+            if mode == "coding":
+                print("Reached origin position")
             
 
     if state == "racing part2 : Lap1":
+        emmergency_detection = "actif"
         if gate_index < len(checkpoints):
             target = [checkpoints[gate_index][0], checkpoints[gate_index][1], checkpoints[gate_index][2], checkpoints[gate_index][3]]
             a=2
@@ -197,7 +221,8 @@ def get_command(sensor_data, camera_data, dt):
         elif gate_index >= len(checkpoints):
             state = "racing part1 : origin position"
             gate_index = 0
-            print("Lap 1 completed, starting Lap 2")
+            if mode == "coding":
+                print("Lap 1 completed, starting Lap 2")
 
 
 
@@ -206,19 +231,21 @@ def get_command(sensor_data, camera_data, dt):
 ###############################################################
                 ##############################
      # Display camera feed with annotations
-    cv2.putText(image, f"State: {state}", (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-    cv2.putText(image, f"Gate: {gate_count}/{5}", (10, 60), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-    try:
-        if angular_error:
-            cv2.putText(image, f"Angular Error: {angular_error:.2f}", (10, 90),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-    except NameError:
-        pass  # angular_error is not defined
 
-    cv2.imshow("Crazyflie FPV Camera", image)
-    cv2.waitKey(1) 
+    if mode == "coding":
+        cv2.putText(image, f"State: {state}", (10, 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.putText(image, f"Gate: {gate_count}/{5}", (10, 60), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        try:
+            if angular_error:
+                cv2.putText(image, f"Angular Error: {angular_error:.2f}", (10, 90),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        except NameError:
+            pass  # angular_error is not defined
+
+        cv2.imshow("Crazyflie FPV Camera", image)
+        cv2.waitKey(1) 
  
     return control_command
 
@@ -474,80 +501,89 @@ def center_drone(current_position,dx,dy, d_yaw, dz, sensor_data):
     return control_command, status
 
 ################################## Traverse function : #######################################
-def traverse_detection(current_position,camera_data,max_area,count):
+def traverse_detection(current_position, camera_data, max_area, count, mode, potential_gate_coord_saved):
     potential_gate_coord = [current_position[0], current_position[1], current_position[2], current_position[3]]
 
-    step_fwd      = 0.20
-    gain_lat      = 0.002
-    gain_alt      = 0.001
-    gain_yaw      = 0.0025
-    max_lat       = 0.25
-    max_alt       = 0.15
-    min_area      = 800
-    image    = camera_data.copy()
-    shapes   = ShapeDetector().detect_shapes(image)
+    step_fwd = 0.20
+    gain_lat = 0.002
+    gain_alt = 0.001
+    gain_yaw = 0.0025
+    max_lat = 0.25
+    max_alt = 0.15
+    min_area = 800
+    image = camera_data.copy()
+    shapes = ShapeDetector().detect_shapes(image)
 
-    #Move frwd to the center of the fence
-    yaw      = current_position[3]
-    step_world = np.array([ step_fwd*math.cos(yaw),
-                            step_fwd*math.sin(yaw),
-                            0.0 ])
+    # Move forward to the center of the fence
+    yaw = current_position[3]
+    step_world = np.array([step_fwd * math.cos(yaw),
+                          step_fwd * math.sin(yaw),
+                          0.0])
 
     lat_body = alt_body = d_yaw = 0.0
 
-    if shapes and shapes[0].area > min_area:#centering fction
+    status = "moving"
+    
+    # If shapes detected, update max_area and save position when area is significant
+    if shapes and shapes[0].area > min_area:
+        # Reset count when shapes are detected
+        count = 0
+        
+        # Track the position with maximum area as a potential gate coordinate
+        if max_area < shapes[0].area:
+            max_area = shapes[0].area
+            potential_gate_coord_saved = [current_position[0], current_position[1], current_position[2], current_position[3]]
+            if mode == "coding":
+                print(f"Updated potential gate coordinate, area: {max_area}")
+        
+        # Centering function
         img_cx = image.shape[1] / 2
         img_cy = image.shape[0] / 2
-        dx_px  = shapes[0].center[0] - img_cx    
-        dy_px  = shapes[0].center[1] - img_cy     
+        dx_px = shapes[0].center[0] - img_cx    
+        dy_px = shapes[0].center[1] - img_cy     
 
         lat_body = -dx_px * gain_lat
         alt_body = -dy_px * gain_alt
-        d_yaw    = -dx_px * gain_yaw
+        d_yaw = -dx_px * gain_yaw
 
-        # limite to max values
-        lat_body = np.clip(lat_body, -max_lat,  max_lat)
-        alt_body = np.clip(alt_body, -max_alt,  max_alt)
+        # Limit to max values
+        lat_body = np.clip(lat_body, -max_lat, max_lat)
+        alt_body = np.clip(alt_body, -max_alt, max_alt)
 
-        #debug 
         step_world += np.array([
             lat_body * -math.sin(yaw),
-            lat_body *  math.cos(yaw),
+            lat_body * math.cos(yaw),
             alt_body])
+        
+        if shapes[0].area < max_area * 0.4 and max_area > 5000:  # Add minimum threshold for max_area
+            status = "reached_target"
+            potential_gate_coord = potential_gate_coord_saved
+            if mode == "coding":
+                print(f"Passed through gate, using saved coordinates: {potential_gate_coord_saved}")
+    else:
+        # No shapes detected
+        count += 1
+        if count > 400:
+            status = "reached_target"
+            # Use the last saved coordinates if available
+            if potential_gate_coord_saved:
+                potential_gate_coord = potential_gate_coord_saved
+            else:
+                potential_gate_coord = [current_position[0], current_position[1], current_position[2], current_position[3]]
+                
+            if mode == "coding":
+                print("No shape detected for a while, moving to next gate")
+                print(f"Using coordinates: {potential_gate_coord}")
 
-    target = [ current_position[0] + step_world[0],
-               current_position[1] + step_world[1],
-               current_position[2] + step_world[2],
-               yaw + d_yaw ]
-    status = "moving"
+    # Calculate target position for movement
+    target = [current_position[0] + step_world[0],
+              current_position[1] + step_world[1],
+              current_position[2] + step_world[2],
+              yaw + d_yaw]
+              
     control_command, _ = move_to_abs_position(current_position, target)
 
-    if shapes and shapes[0].area < max_area*0.4:
-            status = "reached_target"
-            potential_gate_coord = [current_position[0], current_position[1], current_position[2], current_position[3]]
-    
-
-    elif shapes and max_area< shapes[0].area:
-        max_area = shapes[0].area
-
-    # else: 
-    #     if count ==0:
-    #         potential_gate_coord = [current_position[0], current_position[1], current_position[2], current_position[3]]
-    #     count += 1
-
-    #     if count > 1000:
-    #         status = "reached_target"
-    #         print("No shape detected for a while, moving to the next gate")
-    if not shapes:
-        if count ==0:
-            potential_gate_coord = [current_position[0], current_position[1], current_position[2], current_position[3]]
-        count += 0
-        if count > 1000:
-            status = "reached_target"
-            #potential_gate_coord = [current_position[0], current_position[1], current_position[2], current_position[3]]
-            print("No shape detected for a while, moving to the next gate")
-
-    return control_command, status,max_area,count, potential_gate_coord
+    return control_command, status, max_area, count, potential_gate_coord, potential_gate_coord_saved
 ################################################ compute spline *###########################################
 def generate_spline_path_with_yaw(gate_coordinates: List[List[float]], num_points: int = 20):
     def catmull_rom_segment(p0, p1, p2, p3, num_points=20):
